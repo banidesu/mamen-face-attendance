@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 16
+names: ['Abi', 'Agil', 'Alif', 'Anin', 'Bani', 'Citra', 'Dinfeb', 'Dita', 'Jefri', 'Nafisah', 'Nanda', 'Rachel', 'Rangga', 'Rizky', 'Salwa', 'Tidar']
+
+roboflow:
+  workspace: skripsi-d5ymn
+  project: skripsi-mzuql
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/skripsi-d5ymn/skripsi-mzuql/dataset/1

@@ -1,0 +1,174 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Absensi Wajah - Gunadarma</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f9f9fb;
+      color: #333;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      color: #4b0082;
+      margin-bottom: 30px;
+    }
+    #startBtn {
+      display: block;
+      margin: 0 auto 20px auto;
+      padding: 12px 30px;
+      font-size: 18px;
+      font-weight: bold;
+      color: #fff;
+      background: linear-gradient(135deg, #6a0dad, #4b0082);
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      transition: 0.3s ease;
+    }
+    #startBtn:hover {
+      background: linear-gradient(135deg, #4b0082, #6a0dad);
+    }
+    video {
+      display: block;
+      margin: 20px auto;
+      max-width: 480px;
+      border-radius: 12px;
+      border: 3px solid #ddd;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+    }
+    #info, #feedback {
+      text-align: center;
+      font-size: 16px;
+      margin-top: 10px;
+    }
+    #canvas {
+      display: none;
+    }
+    #result-wrapper {
+      display: none;
+      text-align: center;
+      margin-top: 30px;
+    }
+    #captured-img {
+      max-width: 300px;
+      border-radius: 10px;
+      border: 2px solid #bbb;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    #prediction-text {
+      font-size: 20px;
+      font-weight: bold;
+      margin-top: 10px;
+      color: #4b0082;
+    }
+  </style>
+</head>
+<body>
+  <h1>Absensi Asisten Laboratorium</h1>
+
+  <button id="startBtn">Mulai Deteksi Wajah</button>
+  <video id="video" autoplay muted></video>
+  <canvas id="canvas"></canvas>
+  <div id="info">Klik tombol untuk memulai deteksi wajah.</div>
+
+  <div id="result-wrapper">
+    <img id="captured-img" src="" alt="Hasil Capture">
+    <p id="prediction-text"></p>
+  </div>
+
+  <div id="feedback"></div>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const info = document.getElementById('info');
+    let currentStream = null;
+
+    document.getElementById('startBtn').addEventListener('click', async () => {
+      const cameras = await getCameras();
+      if (cameras.length === 0) {
+        info.textContent = "Tidak ada kamera.";
+        return;
+      }
+
+      await setupCamera(cameras[1].deviceId);
+      info.textContent = "Menangkap wajah...";
+      setTimeout(captureAndDetect, 2000);
+    });
+
+    async function getCameras() {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      return devices.filter(device => device.kind === 'videoinput');
+    }
+
+    async function setupCamera(deviceId) {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+      const constraints = deviceId ? { video: { deviceId: { exact: deviceId } } } : { video: true };
+      currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+      video.srcObject = currentStream;
+      await new Promise(resolve => video.onloadedmetadata = resolve);
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+    }
+
+    async function captureAndDetect() {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(async (blob) => {
+        const formData = new FormData();
+        formData.append('frame', blob, 'frame.jpg');
+
+        const response = await fetch('/detect', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.detections && data.detections.length > 0) {
+          const det = data.detections[0];
+          const name = det.class_name;
+          const confidence = det.score;
+
+          document.getElementById('captured-img').src = canvas.toDataURL('image/jpeg');
+          document.getElementById('prediction-text').textContent = `Prediksi: ${name} (${confidence.toFixed(1)}%)`;
+          document.getElementById('result-wrapper').style.display = 'block';
+
+          const res = await fetch('/absen', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nama: name, confidence: confidence })
+          });
+          const resJson = await res.json();
+          showFeedback(resJson.message, resJson.status);
+        } else {
+          showFeedback("Wajah tidak dikenali.", "error");
+        }
+
+        stopCamera();
+      }, 'image/jpeg');
+    }
+
+    function stopCamera() {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+      video.srcObject = null;
+      info.textContent = "Deteksi selesai. Klik tombol untuk mulai lagi.";
+    }
+
+    function showFeedback(message, status) {
+      const feedback = document.getElementById('feedback');
+      feedback.style.color = status === "success" ? "green" : (status === "info" ? "#0050b3" : "red");
+      feedback.textContent = message;
+    }
+  </script>
+</body>
+</html>
