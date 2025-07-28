@@ -91,6 +91,12 @@
     let currentStream = null;
 
     document.getElementById('startBtn').addEventListener('click', async () => {
+      // Reset tampilan sebelumnya
+      document.getElementById('result-wrapper').style.display = 'none';
+      document.getElementById('captured-img').src = '';
+      document.getElementById('prediction-text').textContent = '';
+      document.getElementById('feedback').textContent = '';
+
       const cameras = await getCameras();
       if (cameras.length === 0) {
         info.textContent = "Tidak ada kamera.";
@@ -141,10 +147,11 @@
           document.getElementById('prediction-text').textContent = `Prediksi: ${name} (${confidence.toFixed(1)}%)`;
           document.getElementById('result-wrapper').style.display = 'block';
 
+          const imageData = canvas.toDataURL('image/jpeg');
           const res = await fetch('/absen', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nama: name, confidence: confidence })
+            body: JSON.stringify({ nama: name, confidence: confidence, image_data: imageData })
           });
           const resJson = await res.json();
           showFeedback(resJson.message, resJson.status);

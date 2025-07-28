@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, render_template
 from ultralytics import YOLO
 from datetime import datetime
 import cv2
+import os
 import numpy as np
 import mysql.connector
 
@@ -69,6 +70,19 @@ def absen():
         result = cursor.fetchone()
 
         if not result:
+            # HANYA SIMPAN GAMBAR JIKA ABSEN BARU
+            # Ambil gambar terakhir dari frame webcam (misal dari file temporer atau request)
+            img_data = data.get('image_data')
+            if img_data:
+                import base64
+                from PIL import Image
+                from io import BytesIO
+                os.makedirs("captured", exist_ok=True)
+                img_bytes = base64.b64decode(img_data.split(',')[1])
+                img = Image.open(BytesIO(img_bytes))
+                filename = f"captured/{class_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+                img.save(filename)
+
             query_insert = "INSERT INTO absensi (nama, confidence, waktu) VALUES (%s, %s, %s)"
             cursor.execute(query_insert, (class_name, confidence, waktu))
             conn.commit()
